@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f6f7f2">
+    <title>Wayfarer — Your travel planner</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #17241f;
+        background: #f6f7f2;
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+      }
+
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; }
+      .shell { max-width: 860px; min-height: 100vh; margin: auto; padding: 28px 24px; display: flex; flex-direction: column; }
+      header { display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 700; letter-spacing: .02em; }
+      .mark { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 12px; color: white; background: #17785c; }
+      .hero { max-width: 600px; margin: auto auto 28px; text-align: center; }
+      .eyebrow { color: #17785c; font-size: 12px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; }
+      h1 { margin: 14px 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(38px, 7vw, 60px); font-weight: 500; letter-spacing: -.045em; line-height: 1.05; }
+      .intro { max-width: 470px; margin: 0 auto; color: #64716b; font-size: 16px; line-height: 1.7; }
+      .suggestions { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+      .suggestion { border: 1px solid #dfe5dd; border-radius: 999px; padding: 9px 14px; color: #45554d; background: white; cursor: pointer; font: inherit; font-size: 13px; }
+      .suggestion:hover { border-color: #17785c; color: #17785c; }
+      #conversation { display: flex; flex-direction: column; gap: 18px; margin: 0 0 18px; }
+      .message { max-width: 82%; padding: 14px 17px; border-radius: 18px; white-space: pre-wrap; line-height: 1.6; overflow-wrap: anywhere; }
+      .message.user { align-self: flex-end; color: white; background: #17785c; border-bottom-right-radius: 5px; }
+      .message.assistant { align-self: flex-start; background: white; border: 1px solid #e8ebe5; border-bottom-left-radius: 5px; }
+      .message.error { color: #8b2828; border-color: #f1d1ce; background: #fff7f6; }
+      .composer { position: sticky; bottom: 12px; padding: 10px; border: 1px solid #e1e6de; border-radius: 20px; background: white; box-shadow: 0 12px 40px #22352a12; }
+      .composer form { display: flex; align-items: flex-end; gap: 10px; }
+      textarea { flex: 1; min-height: 48px; max-height: 150px; resize: vertical; border: 0; outline: 0; padding: 12px 10px; color: #17241f; background: transparent; font: inherit; line-height: 1.5; }
+      textarea::placeholder { color: #9aa59f; }
+      .send { min-width: 86px; height: 44px; border: 0; border-radius: 13px; color: white; background: #17785c; cursor: pointer; font: inherit; font-weight: 650; }
+      .send:disabled { cursor: wait; opacity: .6; }
+      .hint { margin: 9px 4px 1px; color: #8a9690; text-align: center; font-size: 11px; }
+      @media (max-width: 560px) {
+        .shell { padding: 20px 16px; }
+        .hero { margin-top: 72px; }
+        .message { max-width: 94%; }
+        .send { min-width: 70px; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header><span class="mark" aria-hidden="true">✦</span><span>WAYFARER</span></header>
+      <section class="hero" id="welcome">
+        <div class="eyebrow">Your personal travel planner</div>
+        <h1>Where will you go next?</h1>
+        <p class="intro">Share a destination or travel idea. I’ll help you explore flights, find stays, and shape an itinerary.</p>
+        <div class="suggestions" aria-label="Example requests">
+          <button class="suggestion" type="button">A weekend in Rome</button>
+          <button class="suggestion" type="button">Plan a trip to Tokyo</button>
+          <button class="suggestion" type="button">A beach escape in Bali</button>
+        </div>
+      </section>
+      <section id="conversation" aria-live="polite" aria-label="Conversation"></section>
+      <section class="composer">
+        <form id="chat-form">
+          <textarea id="message" name="message" maxlength="2000" rows="1" placeholder="Tell me about the trip you have in mind..." aria-label="Your travel request" required></textarea>
+          <button class="send" id="send" type="submit">Plan trip</button>
+        </form>
+        <p class="hint">Travel ideas are AI-generated. Please verify flight details before booking.</p>
+      </section>
+    </main>
+    <script>
+      const form = document.querySelector("#chat-form");
+      const input = document.querySelector("#message");
+      const send = document.querySelector("#send");
+      const conversation = document.querySelector("#conversation");
+      const welcome = document.querySelector("#welcome");
+
+      function addMessage(text, role, isError = false) {
+        const message = document.createElement("div");
+        message.className = `message ${role}${isError ? " error" : ""}`;
+        message.textContent = text;
+        conversation.append(message);
+        message.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        return message;
+      }
+
+      document.querySelectorAll(".suggestion").forEach((button) => {
+        button.addEventListener("click", () => {
+          input.value = button.textContent;
+          input.focus();
+        });
+      });
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const message = input.value.trim();
+        if (!message) return;
+
+        welcome.hidden = true;
+        addMessage(message, "user");
+        input.value = "";
+        input.disabled = true;
+        send.disabled = true;
+        send.textContent = "Planning...";
+        const pending = addMessage("Putting your trip together...", "assistant");
+
+        try {
+          const response = await fetch("/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message })
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || "The request could not be completed.");
+          pending.textContent = data.reply;
+        } catch (error) {
+          pending.classList.add("error");
+          pending.textContent = error.message || "Something went wrong. Please try again.";
+        } finally {
+          input.disabled = false;
+          send.disabled = false;
+          send.textContent = "Plan trip";
+          input.focus();
+        }
+      });
+
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          form.requestSubmit();
+        }
+      });
+    </script>
+  </body>
+</html>
